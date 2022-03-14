@@ -1,0 +1,90 @@
+package main
+import ClosureTimers
+import UnitIndexer
+constant MAXMONSTERCOUNT = 100
+constant TIMEFORCLEAR = 15.0
+constant ENEMYPLAYER = players[4]
+constant MAXMONSTERCOUNTPERWAVE = 110
+constant ENEMYSPAWNPOINT = vec2(0.0, 0.0)
+constant ENEMYDEFAULTFACING = angle(0.0)
+constant ENEMYSPAWNINTERVAL = 1.0
+constant WAVEINTERVAL = 20.0
+class MonsterSpawner
+    private int array[30] monsters
+    private int currentWave = 0
+    private int monsterCounterForCurrentWave = 0
+    private CallbackPeriodic spawnEnemyTimer
+    construct()
+        for i = 0 to 29
+            print(i)
+            this.monsters[i] = 'hfoo'
+        this.newTimer()
+    private function spawn()
+        createUnit(ENEMYPLAYER, this.monsters[this.currentWave], ENEMYSPAWNPOINT, ENEMYDEFAULTFACING)
+        this.monsterCounterForCurrentWave++
+        this.checkCounter()
+    private function nextWave()
+        this.currentWave++
+        this.monsterCounterForCurrentWave = 0
+    function checkCounter()
+        if this.monsterCounterForCurrentWave >= MAXMONSTERCOUNTPERWAVE
+            this.refreshTimer()
+            this.nextWave()
+    function refreshTimer()
+        destroy this.spawnEnemyTimer
+        let intervalTimer = CreateTimer()
+        let intervalTimerDialog = intervalTimer.createTimerDialog()..setTitle("距离下一波还有")..display(true)
+        intervalTimer.doAfter(WAVEINTERVAL) -> 
+            this.newTimer()
+            intervalTimer.destr()
+            intervalTimerDialog.destr()
+    function newTimer()
+        doPeriodically(ENEMYSPAWNINTERVAL) (cb) ->
+            this.spawnEnemyTimer = cb
+            this.spawn()
+class MonsterCounter
+    private int counter = 0
+    private bool timerIsOn = false
+    private timer gameOverTimer
+    private timerdialog gameOverTimerDialog
+    function increase(int num)
+        this.counter += num
+        this.checkCounter()
+    function decrease(int num)
+        this.counter -= num
+        this.checkCounter()
+    function increase()
+        this.counter++
+        this.checkCounter()
+    function decrease()
+        this.counter--
+        this.checkCounter()
+    private function checkCounter()
+        if this.counter >= MAXMONSTERCOUNT and not this.timerIsOn
+            this.spawnGameOverTimer()
+            this.timerIsOn = true
+        if this.counter < MAXMONSTERCOUNT and this.timerIsOn
+            this.despawnTimer()    
+            this.timerIsOn = false
+    private function spawnGameOverTimer()
+        print("怪物数量超过最大上限，15秒内为清理至怪物上限一下则游戏结束")
+        this.gameOverTimer = CreateTimer()
+        this.gameOverTimer.doAfter(TIMEFORCLEAR) ->
+            CustomDefeatBJ(GetLocalPlayer(), "怪物数量超出最大上限，未即时清理，游戏失败")
+        this.gameOverTimerDialog = this.gameOverTimer.createTimerDialog()
+        this.gameOverTimerDialog.setTitle("剩余清理怪物时间")
+        this.gameOverTimerDialog.display(true)
+    private function despawnTimer()
+        this.gameOverTimerDialog.destr()
+        this.gameOverTimer.destr()
+MonsterCounter monsterCounter = new MonsterCounter()
+init
+    onUnitIndex() ->
+        let u = getIndexingUnit()
+        if u.getOwner() == ENEMYPLAYER
+            monsterCounter.increase()
+    onUnitDeindex() ->
+        let u = getIndexingUnit()
+        if u.getOwner() == ENEMYPLAYER
+            monsterCounter.decrease()
+    new MonsterSpawner()
